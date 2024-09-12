@@ -1,0 +1,39 @@
+---
+import Header from '../components/Header.svelte';
+
+
+export interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+
+const light = Astro.cookies.get("light")?.boolean()
+---
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link
+			href="/logo-dark.svg"
+			rel="icon"
+			media="(prefers-color-scheme: light)"
+		/>
+		<link
+			href="/logo-light.svg"
+			rel="icon"
+			media="(prefers-color-scheme: dark)"
+		/>
+
+		<meta name="generator" content={Astro.generator} />
+		<title>{title}</title>
+	</head>
+	<body class="w-screen">
+		<Header client:load light={light}></Header>
+		<main class="max-w-screen-xl mx-auto w-full prose prose-xl">
+			<slot />
+		</main>
+	</body>
+</html>

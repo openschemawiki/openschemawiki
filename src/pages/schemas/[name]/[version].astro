@@ -1,0 +1,88 @@
+---
+import Layout from "#layouts/Layout.astro";
+import { getFilesFromTarball } from "#lib/getFilesFromTarball";
+import { getJsonSchemaFromTarball } from "#lib/getJsonSchemaFromTarball";
+import { getSchemaDirectoryListing } from "#lib/getSchemaDirectoryListing";
+import { parseMarkdown } from "#lib/markdown";
+import SchemaModule from "#modules/SchemaModule.svelte";
+import type { Schema } from "@prisma/client";
+import { prisma, sqids } from "src/shared";
+
+const { name, version } = Astro.params;
+
+if (!name || !version) {
+	return Astro.redirect("/404");
+}
+
+let schema: Schema | null = null;
+const latest = await prisma.schema.findFirst({
+	where: {
+		name
+	},
+	orderBy: {
+		createdAt: "desc"
+	},
+});
+
+if (!latest) {
+	return Astro.redirect("/404");
+}
+
+if (version === "latest") {
+	// Retrieve the latest schema with the provided name
+	schema = latest
+} else {
+	// Retrieve the schema with the provided name and version
+	schema = await prisma.schema.findUnique({
+		where: {
+			name_version: {
+				name,
+				version
+			}
+		}
+	})
+}
+
+
+if (!schema) {
+	return Astro.redirect("/404");
+}
+
+const comments = await prisma.comment.findMany({
+	where: {
+		schema: {
+			id: schema.id
+		}
+	},
+	orderBy: {
+		createdAt: "desc"
+	},
+	select: {
+		Author: {
+			select: {
+				username: true
+			}
+		},
+		createdAt: true,
+		content: true,
+		replyTo: true,
+		id: true,
+	}
+})
+
+const files = await getFilesFromTarball(schema)
+
+const json = files?.jsonify();
+
+const jsonSchema = await getJsonSchemaFromTarball(schema)
+const longDescriptionMarkdown = await parseMarkdown(files?.find("README.md")?.value.data || "")
+const changelog = await parseMarkdown(files?.find("CHANGELOG.md")?.value.data || "")
+const license = await parseMarkdown(files?.find("LICENSE")?.value.data || files?.find("LICENSE.md")?.value.data || "")
+
+schema.id = sqids.encode([schema.id])
+---
+
+
+<Layout title=`${schema.name}:${schema.version} | OpenSchema`>
+	<SchemaModule {schema} {jsonSchema} {latest} {comments} license={license.code} files={json} readme={longDescriptionMarkdown.code} changelog={changelog.code} client:load></SchemaModule>
+</Layout>
